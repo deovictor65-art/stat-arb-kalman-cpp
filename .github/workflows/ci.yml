@@ -10,29 +10,27 @@ jobs:
   build-and-test:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-        compiler: [gcc, clang]
-        exclude:
+        include:
+          - os: ubuntu-latest
+            cxx: g++
+            cc: gcc
+          - os: ubuntu-latest
+            cxx: clang++
+            cc: clang
           - os: windows-latest
-            compiler: gcc
+            cxx: cl
+            cc: cl
 
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up GCC (Ubuntu)
-      if: matrix.os == 'ubuntu-latest' && matrix.compiler == 'gcc'
+    - name: Set Compiler Environment
+      if: runner.os == 'Linux'
       run: |
-        sudo apt-get update
-        sudo apt-get install -y g++-12 cmake
-        echo "CXX=g++-12" >> $GITHUB_ENV
-
-    - name: Set up Clang (Ubuntu)
-      if: matrix.os == 'ubuntu-latest' && matrix.compiler == 'clang'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y clang-16 libc++-16-dev cmake
-        echo "CXX=clang++-16" >> $GITHUB_ENV
+        echo "CXX=${{ matrix.cxx }}" >> $GITHUB_ENV
+        echo "CC=${{ matrix.cc }}" >> $GITHUB_ENV
 
     - name: Configure CMake
       run: cmake -B build -DCMAKE_BUILD_TYPE=Release
@@ -44,10 +42,15 @@ jobs:
       run: ctest --test-dir build --output-on-failure -C Release
 
     - name: Run Simulation
+      shell: bash
       run: |
         if [ "${{ runner.os }}" = "Windows" ]; then
           ./build/Release/statarb_sim.exe
         else
           ./build/statarb_sim
         fi
+
+    - name: Run Python Validation
       shell: bash
+      run: |
+        python python/backtest_pairs.py
