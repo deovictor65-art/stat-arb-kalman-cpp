@@ -1,0 +1,53 @@
+name: C++20 StatArb CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        compiler: [gcc, clang]
+        exclude:
+          - os: windows-latest
+            compiler: gcc
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up GCC (Ubuntu)
+      if: matrix.os == 'ubuntu-latest' && matrix.compiler == 'gcc'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y g++-12 cmake
+        echo "CXX=g++-12" >> $GITHUB_ENV
+
+    - name: Set up Clang (Ubuntu)
+      if: matrix.os == 'ubuntu-latest' && matrix.compiler == 'clang'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang-16 libc++-16-dev cmake
+        echo "CXX=clang++-16" >> $GITHUB_ENV
+
+    - name: Configure CMake
+      run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build Targets
+      run: cmake --build build --config Release
+
+    - name: Run Unit Tests
+      run: ctest --test-dir build --output-on-failure -C Release
+
+    - name: Run Simulation
+      run: |
+        if [ "${{ runner.os }}" = "Windows" ]; then
+          ./build/Release/statarb_sim.exe
+        else
+          ./build/statarb_sim
+        fi
+      shell: bash
